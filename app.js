@@ -1,92 +1,53 @@
 var express = require('express');
 var app = express();
-var mongoose = require('mongoose');
-//DB setup
-mongoose.connect("mongodb://mongo:27017");
 
-var db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', function() {
-  console.log("We're connected to Mongo");
-});
-
-
-var recipeSchema = mongoose.Schema({
-    name: String,
-    serves: Number,
-    author: String,
-    ingredients: [{ name: String, unit: String, quantity: Number }],
-    directions: []
-});
-
-var Recipe = mongoose.model('Recipe', recipeSchema);
-
-function addRecipes() {
-  console.log('Removed all recipes');
-  Recipe.remove({}, function(err) {
-    if (err) {
-			console.log(err);
-		}
-  });
-  console.log('Adding Split Pea Soup with Ham');
-	var recipe = new Recipe({
-    name: 'Split Pea Soup with Ham',
-    serves: 1,
-    author: 'co-op',
-    ingredients: [
-      { name: 'split-pea-soup', unit: 'c', quantity: 1 },
-      { name: 'ham', unit: 'c', quantity: .3 },
-      { name: 'water', unit: 'c', quantity: 1.3 },
-    ],
-    directions: [
-      'Steep in hot water 10 minutes',
-      'Bring to a boil for 2 minutes',
-      'Steep an additional 10 minutes',
-      'Stir and eat'
-    ]
-  }).save();
+// Integration Testing
+var testDebug = false;
+if(typeof process.env.TEST != "undefined") {
+  if(process.env.TEST === "true") {
+     testDebug = true;
+  }
   
-  var recipe = new Recipe({
-    name: 'Southwestern Style Beefy Beans and Rice',
-    serves: 1,
-    author: 'don',
-    ingredients: [
-      { name: 'onion', unit: 'c', quantity: 0.2},
-      { name: 'peppers', unit: 'c', quantity: 0.2},
-      { name: 'black-beans', unit: 'c', quantity: 0.1},
-      { name: 'pinto-beans', unit: 'c', quantity: 0.1},
-      { name: 'garbanzo-beans', unit: 'c', quantity: 0.1},
-      { name: 'salsa-leather', unit: 'c', quantity: 0.3},
-      { name: 'rice', unit: 'c', quantity: 0.3},
-      { name: 'ground-beef', unit: 'c', quantity: 0.3},
-      { name: 'water', unit: 'c', quantity: 1.5},
-    ],
-    directions: [
-      'Steep in hot water 10 minutes',
-      'Bring to a boil for 2 minutes',
-      'Steep an additional 10 minutes',
-      'Stir and eat'
-    ]
-  }).save();
 }
 
-addRecipes();
+var server = function() {
+  app.use(require('./routes/index')());
 
-app.get('/', function(req, res){
-  var resp = [];
-  resp.push("Hello World-changed-2");
-  resp.push('<pre>');
-  Recipe.find({}).exec(function(err, r) {
-    resp.push(JSON.stringify(r, null, 2));
-    resp.push('</pre>');
-    res.send(resp.join(''));
+
+  //error handler
+  app.use((err, req, res, next) => {
+
+    if(!err.status) err.status = 500;  //default errors to 500
+
+    switch(err.status){
+      case 400:
+        if(!err.message) err.message = 'Bad request';
+        break;
+      case 401:
+        if(!err.message) err.message = 'Unauthorized';
+        break;
+      case 404:
+        if(!err.message) err.message = 'Path not found';
+        break;
+      case 500:
+        if(!err.message) err.message = 'Internal Server Error';
+        break;
+      default:
+        console.error('Error handler needs a case for ' + err.status);
+        if(!error.message) err.message = 'Error';
+    }
+    console.log(req.originalUrl);
+    console.error(err);
+    return res.status(err.status).json({"error": err.message});
   });
   
-  //res.send(resp.join(''));
-});
+  app.listen(3000, function () {
+    console.log('Example app listening on port 3000!');
+    if(testDebug) {
+      console.log('Integration Tests completed.  Softly exiting..');
+      process.exit(0);
+    }
+  });
+};
 
-app.listen(3000, function(){
-  console.log('Example app listening on port 3000!');
-});
-
-
+server();
